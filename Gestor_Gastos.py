@@ -1,5 +1,7 @@
 from datetime import datetime
 import sqlite3 as sql
+import csv
+import json
 def Gestor_Inventario_db():
     conexion = sql.connect("Gestor_Gastos.db")
     cursor = conexion.cursor()
@@ -162,7 +164,77 @@ def actualizar():
     except sql.Error as e:
         print(f"Hubo un error al actualizar: {e}")
     finally:
-            conexion.close()
+            conexion.close() 
+def archivo_txt():
+    
+        ahora = datetime.now()
+        fecha = ahora.strftime("%d/%m/%Y %H:%M:%S")
+        conexion = sql.connect("Gestor_Gastos.db")
+        cursor = conexion.cursor()
+        cursor.execute("SELECT id, fecha, tipo, descripcion, monto FROM movimientos")
+        items = cursor.fetchall()
+        with open("Gestor_Gastos.txt","w" ,encoding="utf-8" )as archivo:
+            archivo.write("="*74+"\n")
+            archivo.write("|                            GESTOR DE GASTOS                            |\n")
+            archivo.write("="*74+"\n")
+            archivo.write(f"{'ID':<3} | {'FECHA':<19} | {'TIPO':>10} | {'DESCRIPCIÓN':>21} | {'MONTO':>8}\n")
+            for item in items:
+                linea = (f"{item[0]:<3} | {item[1]:>15} | {item[2]:>10} |  {item[3]:>20} | {item[4]:>8} \n")
+                archivo.write(linea)
+            archivo.write(f"Reporte generado el {fecha}\n")
+        conexion.close()
+def archivo_csv():
+    ahora = datetime.now()
+    fecha = ahora.strftime("%d/%m/%Y %H:%M:%S")
+    conexion = sql.connect("Gestor_Gastos.db")
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, fecha, tipo, descripcion, monto FROM movimientos")
+    items = cursor.fetchall()
+    conexion.close()
+    with open ("Gestor_Gastos.csv", "w", newline="", encoding="utf-8") as archivo:
+        escribir = csv.writer(archivo)
+        escribir.writerow(["ID", "FECHA", "TIPO", "DESCRIPCION", "MONTO"])
+        for item in items:
+            escribir.writerow([
+                item[0],
+                item[1],
+                item[2],
+                item[3],
+                item[4]
+                
+            ])
+        escribir.writerow([])
+        escribir.writerow([f"FECHA REPORTE","","","", fecha])
+    print("Archivo guardado correctamente")
+def archivo_json():
+    ahora = datetime.now()
+    fecha = ahora.strftime("%d/%m/%Y %H:%M:%S")
+    
+    conexion = sql.connect("Gestor_Gastos.db")
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, fecha, tipo, descripcion, monto FROM movimientos")
+    items = cursor.fetchall()
+    conexion.close()
+    datos_json = [ ]
+    for item in items:
+        linea={
+            "ID": item[0],
+            "FECHA": item[1],
+            "TIPO": item[2],
+            "DESCRIPCION": item[3],
+            "MONTO": item[4]
+        }
+        datos_json.append(linea)
+    reporte = {
+        "Fecha_reporte": fecha,
+        "Total_Registros": len(datos_json),
+        "Movimientos": datos_json
+    }
+    with open ("Gestor_Gastos.json", "w", encoding="utf-8")as archivo:
+        json.dump(reporte,archivo,indent=4, ensure_ascii=False)
+    print("Archivo json creado correctamente")
+
+
 def salir():
     print("Hasta luego")
 def menu():
@@ -175,7 +247,10 @@ def menu():
         print("2-Ver Historial  y Saldo Total")
         print("3-Eliminar movimiento")
         print("4-Actualizar")
-        print("5-Salir")
+        print("5-Generar Reporte TXT")
+        print("6-Generar Reporte CSV")
+        print("7-Generar Reporte JSON")
+        print("8-Salir")
         print("\n============================")
         op = input("Ingrese una opcion: ").strip()
         if op == "1":
@@ -186,7 +261,13 @@ def menu():
             eliminar()
         elif op == "4":
             actualizar()
-        elif op == "5":
+        elif op =="5":
+            archivo_txt()
+        elif op =="6":
+            archivo_csv()
+        elif op =="7":
+            archivo_json()
+        elif op == "8":
             salir()
             break
         else:

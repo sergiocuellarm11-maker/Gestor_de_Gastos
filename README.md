@@ -1,28 +1,27 @@
-💰 Gestor de Gastos e Ingresos con SQLite
-¡Bienvenido! Este es un proyecto interactivo desarrollado en Python que funciona a través de la consola. Está diseñado para ayudar a los usuarios a llevar un control financiero básico, permitiendo registrar movimientos, consultar el historial con saldos acumulados, modificar registros y eliminarlos de forma segura.
+# Gestor de Gastos e Ingresos CLI 💰
 
-Este proyecto demuestra el uso de bases de datos relacionales locales, control de excepciones y validación de datos en entornos interactivos.
+Una aplicación de consola interactiva desarrollada en **Python 3** y **SQLite3** que permite llevar un control ordenado de tus finanzas personales mediante un sistema CRUD completo y la generación de reportes en múltiples formatos (TXT, CSV, JSON).
 
-🚀 Características del Proyecto
-Persistencia de Datos: Utiliza SQLite3 para almacenar de forma permanente todos los movimientos en una base de datos local (Gestor_Gastos.db).
+## 🚀 Características
 
-Operaciones CRUD Completas:
+* **Persistencia de Datos:** Creación automática y gestión de una base de datos local robusta utilizando SQLite3.
+* **Operaciones CRUD Completas:**
+    * **Crear:** Registro inteligente de ingresos y gastos de forma simultánea o independiente con validación de entradas numéricas.
+    * **Leer:** Historial completo ordenado de manera descendente (los más recientes primero) con cálculo automático del saldo total acumulado en tiempo real.
+    * **Actualizar:** Modificación de descripción y monto de cualquier movimiento mediante su ID único.
+    * **Eliminar:** Borrado seguro de registros específicos por ID con validación de existencia previa.
+* **Exportación de Reportes Dinámicos:**
+    * **TXT:** Reporte visual estructurado en columnas tabuladas y estéticas.
+    * **CSV:** Archivo plano compatible con Microsoft Excel, Google Sheets y softwares contables.
+    * **JSON:** Estructura jerárquica con metadatos del reporte ideal para integraciones o desarrollos web futuros.
 
-Crear (Create): Registro inteligente de ingresos y gastos de forma independiente con sellado de tiempo automático.
+---
 
-Leer (Read): Historial formateado en columnas legibles con cálculo automático del Saldo Total Acumulado en tiempo real.
+## 🛠️ Tecnologías Utilizadas
 
-Actualizar (Update): Modificación selectiva de la descripción y el monto de cualquier movimiento mediante su identificador único (ID).
+* **Lenguaje:** Python 3.x
+* **Base de Datos:** SQLite3 (Librería nativa `sqlite3`)
+* **Formatos de Intercambio:** `csv`, `json`
+* **Manejo de Fechas:** `datetime`
 
-Borrar (Delete): Eliminación segura de registros específicos por ID.
-
-Control de Errores Robusto: Validación estricta de entradas para evitar que el usuario ingrese texto en campos numéricos, montos negativos o intente operar con IDs inexistentes.
-
-Cierre Seguro de Conexiones: Arquitectura protegida con bloques try/except/finally que garantizan el cierre de la base de datos incluso si ocurren errores en la ejecución, previniendo corrupciones o bloqueos de archivos.
-
-🛠️ Tecnologías Utilizadas
-Python 3
-
-SQLite3 (Motor de base de datos relacional integrado)
-
-Datetime (Para el registro exacto de la fecha y hora de cada transacción)
+---
