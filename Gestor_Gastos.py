@@ -1,275 +1,145 @@
-from datetime import datetime
+import io
 import sqlite3 as sql
 import csv
 import json
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
+
+app = Flask(__name__)
+app.secret_key = "mi_calve_secreta_para_alertas_y_seguridad"
+DATABASE = "inventario.db"
+
 def Gestor_Inventario_db():
-    conexion = sql.connect("Gestor_Gastos.db")
+    conexion = sql.connect(DATABASE)
     cursor = conexion.cursor()
-    # Una sola tabla para todo: Ingresos y Gastos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS movimientos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fecha TEXT NOT NULL,
-            tipo TEXT NOT NULL,
+            monto REAL NOT NULL,
+            gasto REAL NOT NULL,
             descripcion TEXT NOT NULL,
-            monto REAL NOT NULL
+            total REAL NOT NULL
         )
     """)
     conexion.commit()
     conexion.close()
-print("Bienvenido al Gestor de Gastos")
-print("-"*40)
+
 Gestor_Inventario_db()
+
+@app.route('/')
+def index():
+    conexion = sql.connect(DATABASE)
+    cursor = conexion.cursor()
+    cursor.execute("SELECT * FROM movimientos ORDER BY id ASC")
+    movimientos = cursor.fetchall()
+    cursor.execute("SELECT SUM(total) FROM movimientos")
+    resultado_total = cursor.fetchone()[0]
+    gran_total = resultado_total if resultado_total is not None else 0.0
+    
+    conexion.close()
+    return render_template('inventario.html', movimientos=movimientos, gran_total=gran_total)
+
+@app.route('/agregar', methods=['POST'])
 def agregar_gastos():
-    while True:
-        try:
-            monto= float(input("Ingrese sus ingresos: "))
-            if monto < 0:
-                print("ERROR: Recuerda que no se valen numero negativos")
-            else:
-                break
-        except ValueError:
-            print("ERROR: Recuerda que solo van numeros")
-    while True:
-        try: 
-            gastos = float (input("Ingrese la cantidad de gastos: "))
-            if gastos <  0 :
-                print("Recuerda que solo valores positivos")
-            else:
-                break
-        except ValueError:
-            print("ERROR: Recuerda que solo van numeros")
+    monto = float(request.form.get('monto'))
+    gasto = float(request.form.get('gasto'))
+    descripcion = request.form.get('descripcion').strip().upper()
+    total = monto - gasto
     
-    fecha = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-    try:
-        conexion = sql.connect("Gestor_Gastos.db")
-        cursor = conexion.cursor()
-        if monto > 0:
-            cursor.execute(
-                "INSERT INTO movimientos (fecha, tipo, descripcion, monto) VALUES (?, ?, ?, ?)",
-                (fecha, "Ingreso", "Depósito de ingresos", monto),
-            )
-        if gastos > 0:
-            cursor.execute(
-                "INSERT INTO movimientos (fecha, tipo, descripcion, monto) VALUES (?, ?, ?, ?)",
-                (fecha, "Gasto", "Registro de gastos", gastos),
-            )
-
+    conexion = sql.connect(DATABASE)
+    cursor = conexion.cursor()
+    try:    
+        cursor.execute("INSERT INTO movimientos(monto, gasto, descripcion, total) VALUES (?,?,?,?)", (monto, gasto, descripcion, total))
         conexion.commit()
-        total = monto - gastos
-        print(f"¡Registros guardados con éxito!")
-        print(f"Saldo de esta operación: ${total}")
-
-    except sql.Error as e:
-        print(f"Error al guardar en la base de datos: {e}")
+        flash(f"Movimiento agregado correctamente al sistema")
+    except sql.IntegrityError:
+        flash(f"ERROR: El movimiento no pudo ser registrado", "success")
     finally:
         conexion.close()
-def ver_historial ():
-    print("\n---HISTORIAL DE MOVIMIENTOS---")
-    try: 
-        conexion =  sql.connect("Gestor_Gastos.db")
-        cursor = conexion.cursor()
-        cursor.execute(
-        "SELECT id,fecha, tipo,descripcion, monto FROM movimientos ORDER BY id DESC"
-        )
-        movimientos = cursor.fetchall()
-        if not movimientos:
-            print("No hay movimientos registrados aun")
-            return
-        print(f" {'ID':<5} |{'Fecha':<20} | {'Tipo':<8} | {'Descripcion':<25} | {'Monto':<10}")
-        print("-"*70)
-        for mov in movimientos:
-            print(f" {mov[0]:<5} |{mov[1]:<20} | {mov[2]:<8} | {mov[3]:<25} | {mov[4]:<.2f}")
-        cursor.execute(
-                "SELECT SUM(monto) FROM movimientos WHERE tipo = 'Ingreso'"
-            )
-        ingresos_totales = cursor.fetchone()[0] or 0.0
-
-        cursor.execute(
-            "SELECT SUM(monto) FROM movimientos WHERE tipo = 'Gasto'"
-        )
-        gastos_totales = cursor.fetchone()[0] or 0.0
-
-        saldo_total = ingresos_totales - gastos_totales
-        print("-" * 70)
-        print(f"SALDO TOTAL ACUMULADO: ${saldo_total:.2f}")
-
-    except sql.Error as e:
-        print(f"Error al leer la base de datos: {e}")
-    finally:
-        conexion.close()
-def eliminar():
-    while True:
-        try:
-            numero_id = int(input("Ingrese el numero de id a eliminar"))
-            if numero_id <= 0:
-                print("El ID debe ser mayor a cero(0)")
-            else:
-                break
-        except ValueError:
-            print("Recuerda que solo se pueden ingresar numeros positivos")
-    conexion = None
-    try:
-        conexion = sql.connect("Gestor_Gastos.db")
-        cursor = conexion.cursor()
-        cursor.execute("DELETE FROM movimientos WHERE id = ?",(numero_id,))
-        conexion.commit()
-        if cursor.rowcount > 0:
-            print("Movimiento eliminado correctamente")
-        else:
-            print("El movimiento no existe")   
-    except sql.Error as e:
-        print(f"Error al eliminar en la base de datos: {e}")
-    finally:
-        if conexion:
-            conexion.close()
+    return redirect(url_for('index'))
+@app.route('/actualizar', methods=['POST'])
 def actualizar():
-    while True:
-        try:
-            numero_de_id = int(input("Ingrese el numero de ID a actualizar"))
-            if numero_de_id <= 0:
-                print("Recuerda que el id es mayor a cero (0)")
-            else:
-                break
-        except ValueError:
-            print("Recuerda que solo se pueden ingresar numeros positivos")
-    conexion = sql.connect("Gestor_Gastos.db")
-    cursor = conexion.cursor()
-    cursor.execute("SELECT * FROM movimientos WHERE id = ?", (numero_de_id,))
+    id_actualizar = int(request.form.get('id'))
+    nuevo_monto = float(request.form.get('precio'))
+    nuevo_gasto = int(request.form.get('cantidad'))
+    nueva_descripcion = request.form.get('nombre').strip().upper()
+    nuevo_total = nuevo_monto * nuevo_gasto
+    conexion=sql.connect(DATABASE)
+    cursor=conexion.cursor()
+    cursor.execute("SELECT * FROM movimientos WHERE id = ?", (id_actualizar,))
     if cursor.fetchone() is None:
-        print(f"No se encontró ningún movimiento con el ID {numero_de_id}.")
-        conexion.close()
-        return
-    print("Nuevos Datos")
-    print("\n--- Ingrese los nuevos datos ---")
-    nuevo_concepto = input("Nuevo concepto/descripción: ")
-
-    while True:
-        try:
-            nuevo_monto = float(input("Nuevo monto: "))
-            break
-        except ValueError:
-            print("Por favor, ingrese un monto numérico válido.")
-    sentencia_sql = (
-        "UPDATE movimientos SET descripcion = ?, monto = ? WHERE id = ?"
-    )
-    datos = (nuevo_concepto, nuevo_monto, numero_de_id)
-
-    try:
-        cursor.execute(sentencia_sql, datos)
-        conexion.commit()  # Guarda los cambios permanentemente
-        print(
-            f"¡Movimiento con ID {numero_de_id} actualizado correctamente!"
-        )
-    except sql.Error as e:
-        print(f"Hubo un error al actualizar: {e}")
-    finally:
-            conexion.close() 
+        flash(f"⚠️ Error: El movimiento '{id_actualizar}' no existe en el sistema actual.", "danger")
+    else:
+        cursor.execute("UPDATE movimientos SET monto = ?, gasto = ?, descripcion = ?, total = ? WHERE id = ?",(nuevo_monto, nuevo_gasto,nueva_descripcion, nuevo_total, id_actualizar))
+        conexion.commit()
+        flash(f"🔄 ¡Movimiento '{id_actualizar}' actualizado correctamente!", "success")
+        
+    conexion.close()
+    return redirect(url_for('index'))
+@app.route('/eliminar/<int:id>')     
+def eliminar():
+    conexion = sql.connect(DATABASE)
+    cursor= conexion.cursor()
+    cursor.execute("DELETE FROM movimientos WHERE id =?", (id,))
+    conexion.commit()
+    conexion.close()
+    flash("Movimiento eliminado correctamente del sistema.", "success")
+    return redirect(url_for('index'))
+@app.route('/reporte/txt')
 def archivo_txt():
-    
-        ahora = datetime.now()
-        fecha = ahora.strftime("%d/%m/%Y %H:%M:%S")
-        conexion = sql.connect("Gestor_Gastos.db")
-        cursor = conexion.cursor()
-        cursor.execute("SELECT id, fecha, tipo, descripcion, monto FROM movimientos")
-        items = cursor.fetchall()
-        with open("Gestor_Gastos.txt","w" ,encoding="utf-8" )as archivo:
-            archivo.write("="*74+"\n")
-            archivo.write("|                            GESTOR DE GASTOS                            |\n")
-            archivo.write("="*74+"\n")
-            archivo.write(f"{'ID':<3} | {'FECHA':<19} | {'TIPO':>10} | {'DESCRIPCIÓN':>21} | {'MONTO':>8}\n")
-            for item in items:
-                linea = (f"{item[0]:<3} | {item[1]:>15} | {item[2]:>10} |  {item[3]:>20} | {item[4]:>8} \n")
-                archivo.write(linea)
-            archivo.write(f"Reporte generado el {fecha}\n")
-        conexion.close()
+    conexion = sql.connect(DATABASE)
+    cursor= conexion.cursor()
+    cursor.execute("SELECT *FROM movimientos")
+    movimientos = cursor.fetchall()
+    conexion.close()
+    output = io.StringIO()
+    output.write("="*74+"\n")
+    output.write("|                            GESTOR DE GASTOS                            |\n")
+    output.write("="*74+"\n")
+    output.write(f"{'ID':<3} | {'FECHA':<19} | {'TIPO':>10} | {'DESCRIPCIÓN':>21} | {'MONTO':>8}\n")
+    output.write("-"*55 + "\n")
+    for item in movimientos:
+        output.write(f"{item[0]:<3} | {item[1]:>15} | {item[2]:>10} |  {item[3]:>20} | {item[4]:>8} \n")
+    res =Response(output.getvalue(), mimetype="text/plain")
+    res.headers["Content-Disposition"] = "attachment; filename=reporte_gestor_gastos.txt"
+    return res
+@app.route('/reporte/csv')
 def archivo_csv():
-    ahora = datetime.now()
-    fecha = ahora.strftime("%d/%m/%Y %H:%M:%S")
-    conexion = sql.connect("Gestor_Gastos.db")
+    conexion = sql.connect(DATABASE)
     cursor = conexion.cursor()
-    cursor.execute("SELECT id, fecha, tipo, descripcion, monto FROM movimientos")
-    items = cursor.fetchall()
+    cursor.execute("SELECT * FROM movimientos")
+    movimientos = cursor.fetchall()
     conexion.close()
-    with open ("Gestor_Gastos.csv", "w", newline="", encoding="utf-8") as archivo:
-        escribir = csv.writer(archivo)
-        escribir.writerow(["ID", "FECHA", "TIPO", "DESCRIPCION", "MONTO"])
-        for item in items:
-            escribir.writerow([
-                item[0],
-                item[1],
-                item[2],
-                item[3],
-                item[4]
-                
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "FECHA", "TIPO", "DESCRIPCION", "MONTO","TOTAL"])
+    for item in movimientos:
+            writer.writerow([item[0],item[1],item[2],item[3],item[4] 
             ])
-        escribir.writerow([])
-        escribir.writerow([f"FECHA REPORTE","","","", fecha])
-    print("Archivo guardado correctamente")
+    res =Response(output.getvalue(), mimetype="text/csv")
+    res.headers["Content-Disposition"] = "attachment; filename=reporte_gestor_gastos.csv"
+    return res
+@app.route('/reporte/json')
 def archivo_json():
-    ahora = datetime.now()
-    fecha = ahora.strftime("%d/%m/%Y %H:%M:%S")
-    
-    conexion = sql.connect("Gestor_Gastos.db")
+    conexion = sql.connect(DATABASE)
     cursor = conexion.cursor()
-    cursor.execute("SELECT id, fecha, tipo, descripcion, monto FROM movimientos")
-    items = cursor.fetchall()
+    cursor.execute("SELECT * FROM movimientos")
+    movimientos = cursor.fetchall()
     conexion.close()
-    datos_json = [ ]
-    for item in items:
-        linea={
+    
+    datos_json = []
+    for item in movimientos:
+        linea = {
             "ID": item[0],
-            "FECHA": item[1],
-            "TIPO": item[2],
+            "MONTO": item[1],
+            "GASTO": item[2],
             "DESCRIPCION": item[3],
-            "MONTO": item[4]
+            "TOTAL": item[4]
         }
         datos_json.append(linea)
-    reporte = {
-        "Fecha_reporte": fecha,
-        "Total_Registros": len(datos_json),
-        "Movimientos": datos_json
-    }
-    with open ("Gestor_Gastos.json", "w", encoding="utf-8")as archivo:
-        json.dump(reporte,archivo,indent=4, ensure_ascii=False)
-    print("Archivo json creado correctamente")
-
-
-def salir():
-    print("Hasta luego")
-def menu():
-    Gestor_Inventario_db()
-    while True:
-        print("\n============================")
-        print("      GESTOR DE GASTOS         ")
-        print("\n============================")
-        print("1-Agregar Movimientos(Gastos/Ingresos)")
-        print("2-Ver Historial  y Saldo Total")
-        print("3-Eliminar movimiento")
-        print("4-Actualizar")
-        print("5-Generar Reporte TXT")
-        print("6-Generar Reporte CSV")
-        print("7-Generar Reporte JSON")
-        print("8-Salir")
-        print("\n============================")
-        op = input("Ingrese una opcion: ").strip()
-        if op == "1":
-            agregar_gastos()
-        elif op =="2":
-            ver_historial()
-        elif op =="3":
-            eliminar()
-        elif op == "4":
-            actualizar()
-        elif op =="5":
-            archivo_txt()
-        elif op =="6":
-            archivo_csv()
-        elif op =="7":
-            archivo_json()
-        elif op == "8":
-            salir()
-            break
-        else:
-            print("ERROR: Opcion no es valida, Intente de nuevo")
-menu()
+    json_data = json.dumps(datos_json, indent=4, ensure_ascii=False)
+    res = Response(json_data, mimetype="application/json")
+    res.headers["Content-Disposition"] = "attachment; filename=reporte_inventario.json"
+    return res
+    
+if __name__ == '__main__':
+    app.run(debug=True)
